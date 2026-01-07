@@ -1,5 +1,9 @@
 # ComfyUI Ultimate Auto Sampler Config Grid Testing Suite
 
+
+<img width="1856" height="1030" alt="image" src="https://github.com/user-attachments/assets/e1d57553-80a8-4058-aea5-455e6bfbdf8a" />
+
+
 **A professional-grade benchmarking and "IDE-like" testing suite for ComfyUI.**
 
 Stop guessing which Sampler, Scheduler, or CFG value works best. This custom node suite allows you to generate massive Cartesian product grids, view them in an interactive infinite-canvas dashboard, and refine your settings with a "Revise & Generate" workflow without ever leaving the interface.
