@@ -1,3 +1,4 @@
+import re
 import server
 from aiohttp import web
 import json
@@ -15,6 +16,10 @@ async def save_manifest(request):
         session_name = data.get("session_name")
         manifest_data = data.get("manifest")
         
+        # --- sanitize ---
+        if session_name:
+            session_name = re.sub(r'[^\w\-]', '', session_name)
+
         if not session_name or not manifest_data:
             return web.Response(status=400, text="Missing session_name or manifest")
 
@@ -38,6 +43,10 @@ async def get_session_html(request):
         session_name = data.get("session_name")
         node_id = data.get("node_id", "0") # Fallback ID
 
+        # --- sanitize ---
+        if session_name:
+            session_name = re.sub(r'[^\w\-]', '', session_name)
+            
         base_dir = os.path.join(folder_paths.get_output_directory(), "benchmarks", session_name)
         manifest_path = os.path.join(base_dir, "manifest.json")
 

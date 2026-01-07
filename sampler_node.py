@@ -1,3 +1,4 @@
+import re
 import torch
 import json
 import os
@@ -80,6 +81,11 @@ class SamplerGridTester:
             # Wrap in the list structure ComfyUI samplers expect
             negative = [[cond, {"pooled_output": pooled}]]
             neg_text_for_meta = negative_text
+
+        #sanitize session_name
+        session_name = re.sub(r'[^\w\-]', '', session_name)
+        if not session_name:
+            session_name = "default_session"
 
         # --- SETUP FOLDERS & MANIFEST ---
         base_dir = os.path.join(folder_paths.get_output_directory(), "benchmarks", session_name)

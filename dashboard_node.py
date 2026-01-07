@@ -1,3 +1,4 @@
+import re
 import os
 import json
 import folder_paths
@@ -26,6 +27,11 @@ class SamplerConfigDashboardViewer:
         if dashboard_html:
             return {"ui": {"html": [dashboard_html]}}
         
+        # --- sanitize ---
+        if session_name:
+            session_name = re.sub(r'[^\w\-]', '', session_name)
+            
+
         # 2. Otherwise, load from disk (View Mode)
         base_dir = os.path.join(folder_paths.get_output_directory(), "benchmarks", session_name)
         manifest_path = os.path.join(base_dir, "manifest.json")

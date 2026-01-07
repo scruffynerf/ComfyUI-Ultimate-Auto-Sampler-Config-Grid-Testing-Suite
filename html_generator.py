@@ -1,7 +1,6 @@
 import json
 
 def get_html_template(title, manifest_data, node_id):
-    # Ensure backward compatibility if manifest is just a list
     if isinstance(manifest_data, list):
         manifest_data = {"items": manifest_data, "meta": {"model": "", "positive": "", "negative": ""}}
     
@@ -11,9 +10,10 @@ def get_html_template(title, manifest_data, node_id):
 <!DOCTYPE html>
 <html>
 <head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <style>
     :root {{ --bg: #0b0b0b; --card: #141414; --accent: #00d1b2; --accent-sch: #3e8ed0; --accent-lora: #d0873e; --danger: #ff3860; --text: #e0e0e0; }}
-    body {{ background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; margin: 0; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }}
+    body {{ background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; margin: 0; overflow: hidden; height: 100vh; display: flex; flex-direction: column; touch-action: none; }}
     
     /* HEADER INFO */
     #header {{ background: #111; border-bottom: 1px solid #333; padding: 10px 15px; display: flex; gap: 20px; font-size: 11px; align-items: flex-start; }}
@@ -38,20 +38,19 @@ def get_html_template(title, manifest_data, node_id):
     .action-btn:hover {{ background: #444; }}
 
     /* VIEWPORT */
-    #viewport {{ flex-grow: 1; overflow: hidden; position: relative; background: radial-gradient(#222 1px, transparent 1px); background-size: 30px 30px; cursor: grab; }}
+    #viewport {{ flex-grow: 1; overflow: hidden; position: relative; background: radial-gradient(#222 1px, transparent 1px); background-size: 30px 30px; cursor: grab; touch-action: none; }}
     #viewport:active {{ cursor: grabbing; }}
-    #canvas {{ transform-origin: 0 0; position: absolute; padding: 100px; transition: transform 0.1s; }}
+    #canvas {{ transform-origin: 0 0; position: absolute; padding: 100px; transition: transform 0.05s linear; will-change: transform; }}
     .grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; width: 100vw; }}
     
     /* CARDS */
-    .card {{ background: var(--card); border: 1px solid #222; border-radius: 8px; overflow: hidden; position: relative; box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: transform 0.1s; }}
-    .card:hover {{ transform: scale(1.02); border-color: #555; z-index: 5; }}
+    .card {{ background: var(--card); border: 1px solid #222; border-radius: 8px; overflow: hidden; position: relative; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }}
     .card img {{ width: 100%; display: block; }}
     
     .time-tag {{ position: absolute; bottom: 100px; right: 5px; background: rgba(0,0,0,0.8); color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 10px; pointer-events: none; }}
     
-    .revise-btn {{ position: absolute; top: 5px; right: 5px; background: var(--accent); color: #000; border: none; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 10px; cursor: pointer; opacity: 0; transition: 0.2s; }}
-    .reject-btn {{ position: absolute; top: 5px; left: 5px; background: var(--danger); color: #fff; border: none; width: 20px; height: 20px; border-radius: 50%; font-weight: bold; font-size: 12px; cursor: pointer; opacity: 0; transition: 0.2s; display:flex; align-items:center; justify-content:center; }}
+    .revise-btn {{ position: absolute; top: 5px; right: 5px; background: var(--accent); color: #000; border: none; padding: 6px 12px; border-radius: 4px; font-weight: bold; font-size: 11px; cursor: pointer; opacity: 0.8; transition: 0.2s; }}
+    .reject-btn {{ position: absolute; top: 5px; left: 5px; background: var(--danger); color: #fff; border: none; width: 24px; height: 24px; border-radius: 50%; font-weight: bold; font-size: 14px; cursor: pointer; opacity: 0.8; transition: 0.2s; display:flex; align-items:center; justify-content:center; }}
     .card:hover .revise-btn, .card:hover .reject-btn {{ opacity: 1; }}
     
     .info {{ padding: 10px; font-size: 10px; line-height: 1.4; color: #ccc; }}
@@ -74,13 +73,17 @@ def get_html_template(title, manifest_data, node_id):
     .controls {{ flex: 1; background: #111; padding: 20px; border-radius: 8px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }}
     .field {{ display: flex; flex-direction: column; gap: 4px; }}
     .field label {{ color: #888; font-size: 10px; font-weight: bold; text-transform: uppercase; }}
-    .field input {{ background: #000; border: 1px solid #333; color: #fff; padding: 6px; font-size: 12px; }}
+    .field input {{ background: #000; border: 1px solid #333; color: #fff; padding: 8px; font-size: 14px; }}
     
     .reel-wrap {{ margin-top: 20px; height: 30%; display: flex; flex-direction: column; gap: 5px; }}
     .reel {{ display: flex; gap: 10px; overflow-x: auto; padding-bottom: 10px; height: 100%; align-items: center; }}
     .reel img {{ height: 90%; border-radius: 6px; cursor: pointer; border: 2px solid transparent; }}
     .reel img:hover {{ transform: scale(1.05); border-color: var(--accent); }}
     
+    @media (max-width: 800px) {{
+        .modal-main {{ flex-direction: column; height: auto; }}
+        .preview {{ height: 300px; flex: none; }}
+    }}
 </style>
 </head>
 <body>
@@ -148,7 +151,6 @@ def get_html_template(title, manifest_data, node_id):
     const TARGET_NODE_ID = "{node_id}"; 
     const filters = {{ sampler: new Set(), scheduler: new Set(), lora: new Set() }};
 
-    // --- INIT ---
     function init() {{
         document.getElementById('meta-model').innerText = meta.model || "-";
         document.getElementById('meta-pos').innerText = meta.positive || "-";
@@ -158,9 +160,7 @@ def get_html_template(title, manifest_data, node_id):
         initFilters();
     }}
 
-    // --- SERVER SYNC ---
     async function saveState() {{
-        // Save back to server
         try {{
             await fetch('/config_tester/save_manifest', {{
                 method: 'POST',
@@ -172,32 +172,26 @@ def get_html_template(title, manifest_data, node_id):
 
     async function loadSession() {{
         const sess = document.getElementById('session-input').value;
-        // Try to fetch manifest for new session
         try {{
             const r = await fetch(`/view?filename=manifest.json&type=output&subfolder=benchmarks/${{sess}}`);
             if(!r.ok) throw new Error("Session not found");
             const data = await r.json();
-            
-            // RELOAD STATE
             fullManifest = data;
             activeData = fullManifest.items || [];
             meta = fullManifest.meta || {{}};
-            init(); // Re-init UI
-            
+            init(); 
         }} catch(e) {{ alert("Could not load session: " + e.message); }}
     }}
 
-    // --- REJECTION LOGIC ---
     function rejectItem(id) {{
         const item = activeData.find(d => d.id === id);
         if(item) {{
             item.rejected = true;
-            saveState(); // Persist change
+            saveState(); 
             applyFilters();
         }}
     }}
     
-    // --- FILTERS ---
     function initFilters() {{
         ['sampler', 'scheduler', 'lora'].forEach(key => {{
             const unique = [...new Set(activeData.map(d => d[key]))].sort();
@@ -222,7 +216,6 @@ def get_html_template(title, manifest_data, node_id):
     }}
 
     function applyFilters() {{
-        // Filter: Match toggles AND Not Rejected
         const visible = activeData.filter(d => 
             !d.rejected &&
             filters.sampler.has(d.sampler) && 
@@ -230,7 +223,6 @@ def get_html_template(title, manifest_data, node_id):
             filters.lora.has(d.lora)
         );
         
-        // Render Good Grid
         const g = document.getElementById('grid'); g.innerHTML = '';
         visible.forEach(d => {{
             const c = document.createElement('div'); c.className = 'card';
@@ -301,17 +293,84 @@ def get_html_template(title, manifest_data, node_id):
         window.getSelection().removeAllRanges(); window.getSelection().addRange(r);
     }}
 
-    // --- VIEWPORT / MODAL logic same as before (omitted for brevity, keep existing) ---
-    // (Include the existing viewport mouse logic and openM/closeM/triggerGen here)
-    // ...
+    // --- INTERACTION LOGIC (MOUSE + TOUCH) ---
     let s = 1, px = 0, py = 0, sx = 0, sy = 0, down = false;
-    const vp = document.getElementById('viewport'); const cv = document.getElementById('canvas');
+    const vp = document.getElementById('viewport'); 
+    const cv = document.getElementById('canvas');
+    let lastDist = 0;
+
+    // UPDATE TRANSFORM
+    function upd() {{ cv.style.transform = `translate(${{px}}px, ${{py}}px) scale(${{s}})`; }}
+
+    // MOUSE EVENTS
     vp.onmousedown = (e) => {{ down = true; sx = e.clientX - px; sy = e.clientY - py; }};
     window.onmouseup = () => {{ down = false; }};
     window.onmousemove = (e) => {{ if(!down) return; px = e.clientX - sx; py = e.clientY - sy; upd(); }};
-    vp.onwheel = (e) => {{ e.preventDefault(); const x = (e.clientX - px) / s, y = (e.clientY - py) / s; s += -e.deltaY * 0.001; s = Math.min(Math.max(.1, s), 4); px = e.clientX - x * s; py = e.clientY - y * s; upd(); }};
-    function upd() {{ cv.style.transform = `translate(${{px}}px, ${{py}}px) scale(${{s}})`; }}
+    vp.onwheel = (e) => {{ 
+        e.preventDefault(); 
+        const x = (e.clientX - px) / s, y = (e.clientY - py) / s; 
+        s += -e.deltaY * 0.001; 
+        s = Math.min(Math.max(.1, s), 4); 
+        px = e.clientX - x * s; 
+        py = e.clientY - y * s; 
+        upd(); 
+    }};
 
+    // TOUCH EVENTS (Mobile)
+    vp.addEventListener('touchstart', (e) => {{
+        if (e.touches.length === 1) {{
+            // Pan Start
+            down = true;
+            sx = e.touches[0].clientX - px;
+            sy = e.touches[0].clientY - py;
+        }} else if (e.touches.length === 2) {{
+            // Pinch Start
+            down = false;
+            lastDist = Math.hypot(
+                e.touches[0].clientX - e.touches[1].clientX,
+                e.touches[0].clientY - e.touches[1].clientY
+            );
+        }}
+    }}, {{passive: false}});
+
+    vp.addEventListener('touchmove', (e) => {{
+        e.preventDefault(); // Stop page scroll
+        if (e.touches.length === 1 && down) {{
+            // Pan Move
+            px = e.touches[0].clientX - sx;
+            py = e.touches[0].clientY - sy;
+            upd();
+        }} else if (e.touches.length === 2) {{
+            // Pinch Move (Zoom)
+            const dist = Math.hypot(
+                e.touches[0].clientX - e.touches[1].clientX,
+                e.touches[0].clientY - e.touches[1].clientY
+            );
+            const delta = dist - lastDist;
+            
+            // Zoom towards center of pinch
+            const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+            const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+            
+            // Calculate world offset
+            const wx = (cx - px) / s;
+            const wy = (cy - py) / s;
+
+            s += delta * 0.005; // Sensitivity
+            s = Math.min(Math.max(.1, s), 4);
+            
+            // Re-center
+            px = cx - wx * s;
+            py = cy - wy * s;
+            
+            lastDist = dist;
+            upd();
+        }}
+    }}, {{passive: false}});
+
+    vp.addEventListener('touchend', () => {{ down = false; }});
+
+    // --- MODAL & LOGIC ---
     function openM(id) {{
         const d = activeData.find(x => x.id === id);
         document.getElementById('m-img').src = d.file;
@@ -344,6 +403,8 @@ def get_html_template(title, manifest_data, node_id):
             const graph = window.parent.app.graph;
             let node = graph.getNodeById(parseInt(TARGET_NODE_ID));
             if(!node) node = graph._nodes.find(n => n.type === "UltimateSamplerGrid");
+            if(!node) node = graph._nodes.find(n => n.type === "SamplerGridTester");
+
             if(node) {{
                 const widget = node.widgets.find(w => w.name === "configs_json");
                 if(widget) {{
@@ -352,7 +413,7 @@ def get_html_template(title, manifest_data, node_id):
                     const b = event.target; b.innerText = "QUEUED!";
                     setTimeout(() => {{ closeM(); b.innerText = "GENERATE NEW"; }}, 1000);
                 }} else alert("Error: widget not found");
-            }} else alert("Error: node not found");
+            }} else alert("Error: UltimateSamplerGrid node not found");
         }} catch(e) {{ alert("Connection Error: " + e); }}
     }}
     function toggleSort() {{
