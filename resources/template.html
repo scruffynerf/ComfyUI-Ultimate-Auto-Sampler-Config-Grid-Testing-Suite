@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<style>
+    /* INJECTED CSS */
+    __CSS_CONTENT__
+</style>
+</head>
+<body>
+
+<div id="header">
+    <div class="meta-box"><div class="meta-label">Model</div><div class="meta-val" id="meta-model"></div></div>
+    <div class="meta-box"><div class="meta-label">Positive</div><div class="meta-val" id="meta-pos"></div></div>
+    <div class="meta-box"><div class="meta-label">Negative</div><div class="meta-val" id="meta-neg"></div></div>
+</div>
+
+<div id="toolbar">
+    <div class="session-ctrl">
+        <input id="session-input" class="session-input" value="__TITLE__">
+        <button class="action-btn" onclick="loadSession()">LOAD</button>
+    </div>
+
+    <div style="width:1px; height:20px; background:#333; margin:0 5px;"></div>
+    <button class="action-btn" onclick="toggleSort()" id="sort-btn">Sort: Newest</button>
+    
+    <div style="width:1px; height:20px; background:#333; margin:0 5px;"></div>
+    <div class="filter-group"><span class="filter-label">Smp</span><div id="filter-sampler" style="display:flex; gap:2px;"></div></div>
+    <div class="filter-group"><span class="filter-label">Sch</span><div id="filter-scheduler" style="display:flex; gap:2px;"></div></div>
+    <div class="filter-group"><span class="filter-label">Den</span><div id="filter-denoise" style="display:flex; gap:2px;"></div></div>
+    <div class="filter-group"><span class="filter-label">LoRA</span><div id="filter-lora" style="display:flex; gap:2px;"></div></div>
+    
+    <div style="flex-grow:1"></div>
+</div>
+
+<div id="viewport">
+    <div id="canvas"><div class="grid" id="grid"></div></div>
+</div>
+
+<div class="json-container">
+    <div id="json-bar-good" class="json-bar" title="ACCEPTED CONFIGS" onclick="selectJSON('json-bar-good')">[]</div>
+    <div id="json-bar-bad" class="json-bar" title="REJECTED CONFIGS" onclick="selectJSON('json-bar-bad')">[]</div>
+</div>
+
+<div id="modal">
+    <div class="modal-main">
+        <div class="preview"><img id="m-img" src=""></div>
+        <div class="controls">
+            <h2 style="margin:0 0 10px 0; color:#fff;">Revise & Generate</h2>
+            <div class="field"><label>Sampler</label><input id="f-smp"></div>
+            <div class="field"><label>Scheduler</label><input id="f-sch"></div>
+            <div class="field"><label>Steps</label><input id="f-stp" type="number"></div>
+            <div class="field"><label>CFG</label><input id="f-cfg" type="number" step="0.5"></div>
+            <div class="field"><label>Denoise</label><input id="f-den" type="number" step="0.05"></div>
+            <div class="field"><label>LoRA</label><input id="f-lor"></div>
+            <div style="margin-top:auto; display:flex; gap:10px;">
+                <button class="action-btn" style="flex:2; background:var(--accent); color:#000; border:none; height:36px; font-weight:800" onclick="triggerGen()">GENERATE NEW</button>
+                <button class="action-btn" style="flex:1" onclick="closeM()">CANCEL</button>
+            </div>
+        </div>
+    </div>
+    <div class="reel-wrap">
+        <div style="font-size:10px; font-weight:bold; color:#666;">RELATED VARIANTS</div>
+        <div class="reel" id="reel"></div>
+    </div>
+</div>
+
+<script>
+    // INJECTED DATA
+    const TARGET_NODE_ID = "__NODE_ID__"; 
+    let fullManifest = __JSON_DATA__;
+
+    // INJECTED LOGIC
+    __JS_CONTENT__
+</script>
+</body>
+</html>

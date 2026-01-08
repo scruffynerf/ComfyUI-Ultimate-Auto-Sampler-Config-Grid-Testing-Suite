@@ -26,7 +26,7 @@ class SamplerGridTester:
                 "denoise": ("STRING", {"default": "1.0", "multiline": False}), 
                 "vae_batch_size": ("INT", {"default": 4, "min": -1, "max": 64}),
                 "configs_json": ("STRING", {"multiline": True, "default": '[{"sampler": "euler", "scheduler": "normal", "steps": 20, "cfg": 7.0}]'}),
-                "resolutions_json": ("STRING", {"multiline": True, "default": '[[1024, 1024]]'}),
+                "resolutions_json": ("STRING", {"default": '[[1024, 1024]]'}),
                 "session_name": ("STRING", {"default": "my_session"}),
                 "overwrite_existing": ("BOOLEAN", {"default": True}),
             },
@@ -76,23 +76,71 @@ class SamplerGridTester:
             except:
                 return [1.0]
 
-    def run_tests(self, ckpt_name, positive_text, negative_text, seed, denoise, vae_batch_size, overwrite_existing, configs_json, resolutions_json, session_name, unique_id, optional_model=None, optional_clip=None, optional_vae=None, optional_positive=None, optional_negative=None, optional_latent=None):
-        try:
-            raw_configs = json.loads(configs_json.strip())
-            resolutions = json.loads(resolutions_json.strip())
-            denoise_values = self.parse_float_input(str(denoise))
-        except Exception as e: raise ValueError(f"Parsing Error: {e}")
 
-        # --- LOAD RESOURCES ---
-        if optional_model is not None and optional_clip is not None and optional_vae is not None:
-            model, clip, vae = optional_model, optional_clip, optional_vae
+    def run_tests(self, ckpt_name, positive_text, negative_text, seed, denoise, vae_batch_size, overwrite_existing, configs_json, resolutions_json, session_name, unique_id, optional_model=None, optional_clip=None, optional_vae=None, optional_positive=None, optional_negative=None, optional_latent=None):
+        
+        # --- ROBUST JSON ERROR HANDLING ---
+        def parse_json_with_error(json_str, name):
+            try:
+                return json.loads(json_str.strip())
+            except json.JSONDecodeError as e:
+                lines = json_str.split('\n')
+                error_line_idx = e.lineno - 1
+                bad_line = lines[error_line_idx]
+                pointer = " " * (e.colno - 1) + "^"
+                
+                hint = ""
+                if "Expecting property name" in e.msg:
+                    preceding_text = json_str[:e.pos].rstrip()
+                    if preceding_text.endswith(","):
+                        hint = "\n>>> HINT: You have a TRAILING COMMA after the last item.\n>>> JSON does NOT allow commas before a closing bracket '}' or ']'.\n>>> Remove the comma on the line before this error."
+                
+                if "Expecting property name" in e.msg and "'" in bad_line:
+                    hint += "\n>>> HINT: Ensure you are using DOUBLE QUOTES (\") for keys and strings, not single quotes (')."
+
+                error_msg = (
+                    f"\n\n[JSON ERROR] in {name}:\n"
+                    f"---------------------------------------------------\n"
+                    f"{e.msg}\n"
+                    f"Line {e.lineno}:  {bad_line}\n"
+                    f"          {pointer}\n"
+                    f"---------------------------------------------------"
+                    f"{hint}\n"
+                )
+                raise ValueError(error_msg)
+
+        try:
+            raw_configs = parse_json_with_error(configs_json, "Configs JSON")
+            resolutions = parse_json_with_error(resolutions_json, "Resolutions JSON")
+            denoise_values = self.parse_float_input(str(denoise))
+        except Exception as e: 
+            raise ValueError(f"{e}")
+
+        # --- LOAD RESOURCES (FIXED LOGIC) ---
+        # 1. Model & Clip: Prioritize Optional, else load Checkpoint
+        if optional_model is not None and optional_clip is not None:
+            model = optional_model
+            clip = optional_clip
             model_name_for_meta = "External Model"
+            # 'vae' is undefined here momentarily if not passed externally
         else:
             ckpt_path = folder_paths.get_full_path("checkpoints", ckpt_name)
             out = comfy.sd.load_checkpoint_guess_config(ckpt_path, output_vae=True, output_clip=True, embedding_directory=folder_paths.get_folder_paths("embeddings"))
             model, clip, vae = out[:3]
             model_name_for_meta = ckpt_name
 
+        # 2. VAE: Prioritize Optional, else ensure fallback
+        if optional_vae is not None:
+            # User plugged in a VAE (Overrides everything)
+            vae = optional_vae
+        elif 'vae' not in locals():
+            # We are here if: External Model used, but NO External VAE provided.
+            # We must load the VAE from the selected checkpoint as a fallback.
+            ckpt_path = folder_paths.get_full_path("checkpoints", ckpt_name)
+            out = comfy.sd.load_checkpoint_guess_config(ckpt_path, output_vae=True, output_clip=False, embedding_directory=folder_paths.get_folder_paths("embeddings"))
+            vae = out[2]
+        
+        # 3. Conditioning (Prompts)
         if optional_positive is not None:
             positive = optional_positive
             pos_text_for_meta = "External Conditioning"
@@ -113,7 +161,8 @@ class SamplerGridTester:
 
         session_name = re.sub(r'[^\w\-]', '', session_name)
         if not session_name: session_name = "default_session"
-
+        
+        # ... (Rest of the function remains exactly the same) ...
         base_dir = os.path.join(folder_paths.get_output_directory(), "benchmarks", session_name)
         img_dir = os.path.join(base_dir, "images")
         os.makedirs(img_dir, exist_ok=True)
@@ -162,13 +211,15 @@ class SamplerGridTester:
         cached_model, cached_clip = None, None
         pending_batch = []
         
-        # Keys that determine a "match"
-        MATCH_KEYS = ["sampler", "scheduler", "steps", "cfg", "lora", "str_model", "str_clip", "denoise", "seed", "width", "height"]
+        MATCH_KEYS = ["sampler", "scheduler", "steps", "cfg", "lora", "str_model", "str_clip", "denoise", "seed", "width", "height", "positive", "negative"]
 
         def flush_batch(batch_list):
             if not batch_list: return
             latents_to_decode = torch.cat([x[0] for x in batch_list], dim=0)
+            
+            # --- USE THE CORRECT VAE HERE ---
             decoded = vae.decode(latents_to_decode)
+            
             for i, img_tensor in enumerate(decoded):
                 img_np = 255. * img_tensor.cpu().numpy()
                 img = Image.fromarray(np.clip(img_np, 0, 255).astype(np.uint8))
@@ -194,14 +245,14 @@ class SamplerGridTester:
                 for idx, item in enumerate(existing_data["items"]):
                     is_match = True
                     for k in MATCH_KEYS:
-                        # Values in conf come from JSON inputs
                         val_conf = conf.get(k)
-                        # Special handling for resolution/seed which aren't in 'conf' dict yet
                         if k == "width": val_conf = w
                         if k == "height": val_conf = h
                         if k == "seed": val_conf = seed
                         
-                        # Compare
+                        if k == "positive": val_conf = pos_text_for_meta
+                        if k == "negative": val_conf = neg_text_for_meta
+                        
                         if item.get(k) != val_conf:
                             is_match = False
                             break
@@ -211,17 +262,10 @@ class SamplerGridTester:
                         break
 
                 if match_index != -1:
-                    # Match Found!
                     if not overwrite_existing:
-                        # Skip generation
-                        print(f"[GridTester] Skipping existing config: {conf}")
                         continue
                     else:
-                        # Overwrite mode: Delete old file and remove from manifest
-                        print(f"[GridTester] Overwriting existing config...")
                         old_item = existing_data["items"][match_index]
-                        # Extract filename from the URL-like string
-                        # Format: /view?filename=img_123.webp&...
                         try:
                             old_fname_match = re.search(r'filename=([^&]+)', old_item["file"])
                             if old_fname_match:
@@ -232,7 +276,6 @@ class SamplerGridTester:
                         except Exception as e:
                             print(f"Error cleaning up old file: {e}")
                         
-                        # Remove from list (new one will be added at top later)
                         existing_data["items"].pop(match_index)
 
                 # --- MODEL LOADING ---
@@ -272,7 +315,10 @@ class SamplerGridTester:
                 
                 duration = round(time.time() - t0, 3)
                 meta = conf.copy()
-                meta.update({"width": w, "height": h, "duration": duration, "seed": seed})
+                meta.update({
+                    "width": w, "height": h, "duration": duration, "seed": seed,
+                    "positive": pos_text_for_meta, "negative": neg_text_for_meta
+                })
                 pending_batch.append((result[0]["samples"], meta))
                 
                 if vae_batch_size != -1 and len(pending_batch) >= vae_batch_size:

@@ -72,20 +72,22 @@ The `configs_json` widget determines your grid. It accepts an array of objects. 
 
 **Example:**
 ```json
-[
-  {
-    "sampler": ["euler", "dpmpp_2m"],
-    "scheduler": ["normal", "karras"],
-    "steps": [20, 30],
-    "cfg": [7.0, 8.0],
-    "lora": "None",
-    "str_model": 1.0,
-    "str_clip": 1.0
-  }
-]
+    [
+      {
+        "sampler": ["euler", "dpmpp_2m"],
+        "scheduler": ["normal", "karras"],
+        "steps": [20, 30],
+        "cfg": [7.0, 8.0],
+        "lora": [
+            "MyStyle.safetensors:0.8:1.0",
+            "MyStyle.safetensors:0.5:1.0 + Detailer.safetensors:1.0"
+        ]
+      }
+    ]
 ```
-*This example generates 8 images (2 samplers × 2 schedulers × 2 steps × 1 cfg).*
+*This example generates 32 images (2 samplers × 2 schedulers × 2 steps × 2 cfg * 2 lora configs).*
 
+*Note that the lora accepts stength_model and strength_clip with :1.0:1.0 floats after the filename of the lora and can stack multiple loras with the + symbol between entries*
 
 ## Here are some combos you can try!
 
@@ -99,33 +101,31 @@ The `configs_json` widget determines your grid. It accepts an array of objects. 
         "scheduler": ["karras", "normal"],
         "steps": [25, 30],
         "cfg": [6.0, 7.0],
-        "lora": "None",
-        "str_model": 1.0,
-        "str_clip": 1.0
+        "lora": "None"
       }
     ]
     
 
 ## 🎨 Group 2: Artistic & Painterly
 
-*Tests 5 creative/soft combinations best for illustration and anime.* 5 samplers x 2 schedulers x 3 step settings x 3 cfgs = 90 images
+*Tests 5 creative/soft combinations best for illustration and anime.* 
+5 samplers x 2 schedulers x 3 step settings x 3 cfgs = 90 images
 
-    [
-      {
-        "sampler": ["euler_ancestral", "dpmpp_sde", "dpmpp_2s_ancestral", "restart", "lms"],
-        "scheduler": ["normal", "karras"],
-        "steps": [20, 30, 40],
-        "cfg": [5.0, 6.0, 7.0],
-        "lora": "None",
-        "str_model": 1.0,
-        "str_clip": 1.0
-      }
-    ]
+  [
+    {
+      "sampler": ["euler", "dpmpp_2m"],
+      "scheduler": ["simple", "beta", "normal"],
+      "steps": [20, 25, 30],
+      "cfg": [1.0, 4.5],
+      "lora": "None"
+    }
+  ]
     
 
 ## ⚡ Group 3: Speed / Turbo / LCM
 
-*Tests 4 ultra-fast configs. (Note: Ensure you are using a Turbo/LCM capable model or LoRA).* 4 samplers x 3 schedulers x 4 step settings x 2 cfgs = 96 images
+*Tests 4 ultra-fast configs. (Note: Ensure you are using a Turbo/LCM capable model or LoRA).* 
+4 samplers x 3 schedulers x 4 step settings x 2 cfgs = 96 images
 
     [
       {
@@ -133,16 +133,15 @@ The `configs_json` widget determines your grid. It accepts an array of objects. 
         "scheduler": ["simple", "sgm_uniform", "karras"],
         "steps": [4, 5, 6, 8],
         "cfg": [1.0, 1.5],
-        "lora": "None",
-        "str_model": 1.0,
-        "str_clip": 1.0
+        "lora": "None"
       }
     ]
     
 
 ## 🦾 Group 4: Flux & SD3 Specials
 
-*Tests 4 configs specifically tuned for newer Rectified Flow models like Flux and SD3.* 2 samplers x 3 schedulers x 3 step settings x 2 cfgs = 36 images
+*Tests 4 configs specifically tuned for newer Rectified Flow models like Flux and SD3.* 
+2 samplers x 3 schedulers x 3 step settings x 2 cfgs = 36 images
 
     [
       {
@@ -151,15 +150,14 @@ The `configs_json` widget determines your grid. It accepts an array of objects. 
         "steps": [20, 25, 30],
         "cfg": [1.0, 4.5],
         "lora": "None",
-        "str_model": 1.0,
-        "str_clip": 1.0
       }
     ]
     
 
 ## 🧪 Group 5: Experimental & Unique
 
-*Tests 6 weird/niche combinations for discovering unique textures.* 6 samplers x 4 schedulers x 5 step settings x 4 cfgs = 480 images
+*Tests 6 weird/niche combinations for discovering unique textures.*
+ 6 samplers x 4 schedulers x 5 step settings x 4 cfgs = 480 images
 
     [
       {
@@ -168,8 +166,6 @@ The `configs_json` widget determines your grid. It accepts an array of objects. 
         "steps": [25, 30, 35, 40, 50],
         "cfg": [4.5, 6.0, 7.0, 8.0],
         "lora": "None",
-        "str_model": 1.0,
-        "str_clip": 1.0
       }
     ]
 

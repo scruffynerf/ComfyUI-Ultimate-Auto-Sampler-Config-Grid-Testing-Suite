@@ -36,7 +36,7 @@ app.registerExtension({
                             });
                             
                             if (resp.ok) {
-                                alert("Session Deleted.");
+                                // alert("Session Deleted.");
                                 node.iframe.srcdoc = "<h3 style='color:#888; text-align:center; padding:20px;'>Session Deleted.</h3>";
                             } else {
                                 alert("Error: " + await resp.text());
