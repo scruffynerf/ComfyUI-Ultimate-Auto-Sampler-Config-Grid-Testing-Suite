@@ -4,10 +4,37 @@ from aiohttp import web
 import json
 import os
 import folder_paths
+import shutil
 from .sampler_node import SamplerGridTester
 from .dashboard_node import SamplerConfigDashboardViewer
 from .html_generator import get_html_template
 
+# --- API: DELETE SESSION ---
+@server.PromptServer.instance.routes.post("/config_tester/delete_session")
+async def delete_session(request):
+    try:
+        data = await request.json()
+        session_name = data.get("session_name")
+
+        # Sanitize
+        if session_name:
+            session_name = re.sub(r'[^\w\-]', '', session_name)
+        
+        if not session_name or session_name == "default_session":
+             return web.Response(status=400, text="Invalid session name")
+
+        # Path construction
+        base_dir = os.path.join(folder_paths.get_output_directory(), "benchmarks", session_name)
+        
+        if os.path.exists(base_dir):
+            shutil.rmtree(base_dir) # Deletes the folder and images
+            return web.Response(status=200, text="Deleted")
+        else:
+            return web.Response(status=404, text="Session not found")
+
+    except Exception as e:
+        return web.Response(status=500, text=str(e))
+    
 # --- API: SAVE MANIFEST ---
 @server.PromptServer.instance.routes.post("/config_tester/save_manifest")
 async def save_manifest(request):
