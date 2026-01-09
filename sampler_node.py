@@ -170,6 +170,41 @@ class SamplerGridTester:
             "updated": int(time.time())
         }
 
+        # --- PREPARE INPUT JOBS (BATCH SUPPORT) ---
+        input_jobs = [] 
+        # Format: {"label": str, "width": int, "height": int, "latent": dict_or_none, "batch_idx": int}
+
+        if optional_latent is not None:
+            # Mode: Input Latents (Batch support)
+            # We iterate over the batch dimension of the provided latent
+            batch_count = optional_latent["samples"].shape[0]
+            print(f"[GridTester] Input Latent Batch Size: {batch_count}. Iterating...")
+            
+            for i in range(batch_count):
+                # Extract single item from batch [1, C, H, W]
+                single_sample = optional_latent["samples"][i].unsqueeze(0) 
+                current_h = single_sample.shape[2] * 8
+                current_w = single_sample.shape[3] * 8
+                
+                input_jobs.append({
+                    "label": f"Input {i+1}",
+                    "width": current_w,
+                    "height": current_h,
+                    "latent": {"samples": single_sample},
+                    "batch_idx": i
+                })
+        else:
+            # Mode: Empty Latents (Resolution list)
+            for res in resolutions:
+                w, h = res[0], res[1]
+                input_jobs.append({
+                    "label": f"{w}x{h}",
+                    "width": w,
+                    "height": h,
+                    "latent": None, # Will generate zeros
+                    "batch_idx": 0
+                })
+
         # --- EXPAND CONFIGS ---
         ALL_SCHEDULERS = comfy.samplers.KSampler.SCHEDULERS
         ALL_SAMPLERS = comfy.samplers.KSampler.SAMPLERS
@@ -193,22 +228,19 @@ class SamplerGridTester:
                     "negative": combo[9]
                 })
 
-        # --- INTELLIGENT SORTING (OPTIMIZATION) ---
-        # Sort by: 1. LoRA (Expensive), 2. Prompt (Moderate), 3. Sampler/Settings (Cheap)
-        # This groups similar runs together to minimize model patching and text encoding.
-        expanded.sort(key=lambda x: (x['lora'], x['str_model'], x['str_clip'], x['positive'], x['negative']))
+        # --- INTELLIGENT SORTING ---
+        expanded.sort(key=lambda x: (x['lora'], x['positive'], x['negative']))
 
-        print(f"[GridTester] Processing {len(expanded) * len(resolutions)} items...")
+        print(f"[GridTester] Processing {len(expanded) * len(input_jobs)} items...")
 
         cached_lora_key = None
         cached_model, cached_clip = None, None
         
-        # Condition Cache
         cached_pos_key, cached_neg_key = None, None
         cached_positive, cached_negative = None, None
 
         pending_batch = []
-        MATCH_KEYS = ["sampler", "scheduler", "steps", "cfg", "lora", "str_model", "str_clip", "denoise", "seed", "width", "height", "positive", "negative"]
+        MATCH_KEYS = ["sampler", "scheduler", "steps", "cfg", "lora", "str_model", "str_clip", "denoise", "seed", "width", "height", "positive", "negative", "batch_idx"]
 
         def flush_batch(batch_list):
             if not batch_list: return
@@ -228,8 +260,12 @@ class SamplerGridTester:
                 })
                 existing_data["items"].insert(0, meta)
         
-        for res in resolutions:
-            w, h = res[0], res[1]
+        # --- MASTER LOOP ---
+        for job in input_jobs:
+            w, h = job["width"], job["height"]
+            batch_idx = job["batch_idx"]
+            
+            # Flush between different input images to prevent VAE size mismatch crashes
             flush_batch(pending_batch)
             pending_batch = []
 
@@ -243,6 +279,7 @@ class SamplerGridTester:
                         if k == "width": val_conf = w
                         if k == "height": val_conf = h
                         if k == "seed": val_conf = seed
+                        if k == "batch_idx": val_conf = batch_idx # Check input image match
                         
                         if item.get(k) != val_conf:
                             is_match = False
@@ -271,7 +308,6 @@ class SamplerGridTester:
                 active_loras = self.parse_lora_definition(conf["lora"], conf["str_model"], conf["str_clip"])
                 current_lora_key = tuple(active_loras)
                 
-                # Only patch model if LoRA config changed
                 if current_lora_key == cached_lora_key and cached_model is not None:
                     curr_model, curr_clip = cached_model, cached_clip
                 else:
@@ -284,14 +320,12 @@ class SamplerGridTester:
                             curr_model, curr_clip = comfy.sd.load_lora_for_models(curr_model, curr_clip, lora_data, lstr_m, lstr_c)
                     cached_lora_key = current_lora_key
                     cached_model, cached_clip = curr_model, curr_clip
-                    # Reset conditioning cache because Clip model changed
                     cached_positive, cached_negative = None, None 
 
                 # --- 2. OPTIMIZED CONDITIONING ---
                 if optional_positive is not None:
                     positive = optional_positive
                 else:
-                    # Check cache
                     if conf["positive"] == cached_pos_key and cached_positive is not None:
                         positive = cached_positive
                     else:
@@ -304,7 +338,6 @@ class SamplerGridTester:
                 if optional_negative is not None:
                     negative = optional_negative
                 else:
-                    # Check cache
                     if conf["negative"] == cached_neg_key and cached_negative is not None:
                         negative = cached_negative
                     else:
@@ -315,8 +348,8 @@ class SamplerGridTester:
                         cached_neg_key = conf["negative"]
 
                 # --- LATENT SETUP ---
-                if optional_latent is not None:
-                    latent_in = {"samples": optional_latent["samples"].clone()}
+                if job["latent"] is not None:
+                    latent_in = {"samples": job["latent"]["samples"].clone()}
                 else:
                     latent_in = {"samples": torch.zeros([1, 4, h // 8, w // 8])}
 
@@ -336,7 +369,7 @@ class SamplerGridTester:
                 duration = round(time.time() - t0, 3)
                 meta = conf.copy()
                 meta.update({
-                    "width": w, "height": h, "duration": duration, "seed": seed
+                    "width": w, "height": h, "duration": duration, "seed": seed, "batch_idx": batch_idx
                 })
                 pending_batch.append((result[0]["samples"], meta))
                 
